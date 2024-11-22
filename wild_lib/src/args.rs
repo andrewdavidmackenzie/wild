@@ -134,11 +134,6 @@ const IGNORED_FLAGS: &[&str] = &[
     "no-relax",
 ];
 
-pub(crate) fn from_env() -> Result<Action> {
-    // Skip program name here
-    parse(std::env::args().skip(1))
-}
-
 // Parse the supplied input arguments, which should not include the program name.
 #[allow(clippy::if_same_then_else)]
 pub(crate) fn parse<S: AsRef<str>, I: Iterator<Item = S>>(mut input: I) -> Result<Action> {
