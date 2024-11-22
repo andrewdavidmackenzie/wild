@@ -57,7 +57,7 @@ pub struct Linker {
 }
 
 impl Linker {
-    pub fn from_args<S: AsRef<str>, I: Iterator<Item=S>>(args: I) -> error::Result<Self> {
+    pub fn from_args<S: AsRef<str>, I: Iterator<Item = S>>(args: I) -> error::Result<Self> {
         Ok(Linker {
             action: parse(args)?,
         })
