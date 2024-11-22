@@ -1,10 +1,12 @@
 use anyhow::anyhow;
-use fork::{fork, Fork};
+use fork::fork;
+use fork::Fork;
 use std::env::args;
 use std::ffi::CString;
 use std::fs::File;
 use std::io::Error;
-use std::io::{Read, Write};
+use std::io::Read;
+use std::io::Write;
 
 fn main() -> wild_lib::error::Result {
     // skip the program name
