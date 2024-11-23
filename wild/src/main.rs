@@ -1,6 +1,5 @@
 use anyhow::anyhow;
-use fork::fork;
-use fork::Fork;
+use libc::fork;
 use std::env::args;
 use std::ffi::CString;
 use std::fs::File;
@@ -28,30 +27,37 @@ fn main() -> wild_lib::error::Result {
     match fork_subprocess {
         true => match make_named_pipe() {
             Ok(path) => {
-                match fork() {
-                    Ok(Fork::Child) => {
-                        // Create a linker with remaining args and run it
-                        wild_lib::Linker::from_args(args.into_iter())?.run()?;
-
-                        // inform parent that we are done!
-                        let mut f = File::open(path)?;
-                        f.write_all(&0i32.to_ne_bytes())?;
-                        Ok(())
-                    }
-                    Ok(Fork::Parent(_child)) => {
-                        // Wait for child to exit or pipe to be closed
-                        let mut f = File::open(path)?;
-                        let mut response = [0u8; 4];
-                        let count = f.read(&mut response)?;
-                        if count != 4 {
-                            return Err(anyhow!("Error retrieving exit status from child process"));
+                unsafe {
+                    match fork() {
+                        0 => {
+                            // Success in the parent
+                            // Wait for child to exit or pipe to be closed
+                            let mut f = File::open(path)?;
+                            let mut response = [0u8; 4];
+                            let count = f.read(&mut response)?;
+                            if count != 4 {
+                                return Err(anyhow!(
+                                    "Error retrieving exit status from child process"
+                                ));
+                            }
+                            let child_exit_status = i32::from_ne_bytes(response);
+                            std::process::exit(child_exit_status);
                         }
-                        let child_exit_status = i32::from_ne_bytes(response);
-                        std::process::exit(child_exit_status);
-                    }
-                    Err(_) => {
-                        // Create a linker with remaining args and run it
-                        wild_lib::Linker::from_args(args.into_iter())?.run()
+                        -1 => {
+                            // Failure in the parent
+                            // Create a linker with remaining args and run it
+                            wild_lib::Linker::from_args(args.into_iter())?.run()
+                        }
+                        _ => {
+                            // Success in the child
+                            // Create a linker with remaining args and run it
+                            wild_lib::Linker::from_args(args.into_iter())?.run()?;
+
+                            // inform parent that we are done!
+                            let mut f = File::open(path)?;
+                            f.write_all(&0i32.to_ne_bytes())?;
+                            Ok(())
+                        }
                     }
                 }
             }
