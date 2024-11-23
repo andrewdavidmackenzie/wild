@@ -2,6 +2,7 @@ use anyhow::anyhow;
 use libc::fork;
 use std::env::args;
 use std::ffi::CString;
+use std::fs;
 use std::fs::File;
 use std::io::Error;
 use std::io::Read;
@@ -12,27 +13,26 @@ fn main() -> wild_lib::error::Result {
     let mut args: Vec<String> = args().skip(1).collect();
 
     // See if there is a better way to do this, more canonical
-    let mut fork_subprocess = false;
+    let mut no_fork_subprocess = false;
 
-    // TODO decide if we want some short-form equivalent of "--fork"
     args.retain(|a| {
-        if a == "--fork" {
-            fork_subprocess = true;
+        if a == "--no-fork" {
+            no_fork_subprocess = true;
             false
         } else {
             true
         }
     });
 
-    match fork_subprocess {
-        true => match make_named_pipe() {
+    match no_fork_subprocess {
+        false => match make_named_pipe() {
             Ok(path) => {
                 unsafe {
                     match fork() {
                         0 => {
                             // Success in the parent
                             // Wait for child to exit or pipe to be closed
-                            let mut f = File::open(path)?;
+                            let mut f = File::open(&path)?;
                             let mut response = [0u8; 4];
                             let count = f.read(&mut response)?;
                             if count != 4 {
@@ -41,6 +41,7 @@ fn main() -> wild_lib::error::Result {
                                 ));
                             }
                             let child_exit_status = i32::from_ne_bytes(response);
+                            fs::remove_file(path)?;
                             std::process::exit(child_exit_status);
                         }
                         -1 => {
@@ -66,7 +67,7 @@ fn main() -> wild_lib::error::Result {
                 wild_lib::Linker::from_args(args.into_iter())?.run()
             }
         },
-        false => {
+        true => {
             // Create a linker with remaining args and run it
             wild_lib::Linker::from_args(args.into_iter())?.run()
         }
