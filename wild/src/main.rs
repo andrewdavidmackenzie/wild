@@ -85,13 +85,11 @@ fn make_named_pipe() -> wild_lib::error::Result<String> {
         fs::remove_file(&path)?;
     }
     let filename = CString::new(path.as_str())?;
-    unsafe {
-        match libc::mkfifo(filename.as_ptr(), 0o660) {
-            0 => Ok(path.to_owned()),
-            _ => Err(anyhow!(
-                "Error creating named pipe. Errno = {:?}",
-                Error::last_os_error().raw_os_error().unwrap_or(-1)
-            )),
-        }
+    match unsafe { libc::mkfifo(filename.as_ptr(), 0o660) } {
+        0 => Ok(path.to_owned()),
+        _ => Err(anyhow!(
+            "Error creating named pipe. Errno = {:?}",
+            Error::last_os_error().raw_os_error().unwrap_or(-1)
+        )),
     }
 }
