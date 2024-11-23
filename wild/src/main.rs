@@ -7,6 +7,7 @@ use std::fs::File;
 use std::io::Error;
 use std::io::Read;
 use std::io::Write;
+use std::path::Path;
 
 fn main() -> wild_lib::error::Result {
     // skip the program name
@@ -31,9 +32,9 @@ fn main() -> wild_lib::error::Result {
                     match fork() {
                         0 => {
                             // Success in the parent
-                            // Wait for child to exit or pipe to be closed
                             let mut f = File::open(&path)?;
                             let mut response = [0u8; 4];
+                            // Wait for child to exit or pipe to be closed
                             let count = f.read(&mut response)?;
                             if count != 4 {
                                 return Err(anyhow!(
@@ -54,7 +55,7 @@ fn main() -> wild_lib::error::Result {
                             // Create a linker with remaining args and run it
                             wild_lib::Linker::from_args(args.into_iter())?.run()?;
 
-                            // inform parent that we are done!
+                            // inform parent that we are done! - TODO this will be done in Linker
                             let mut f = File::open(path)?;
                             f.write_all(&0i32.to_ne_bytes())?;
                             Ok(())
@@ -79,6 +80,9 @@ fn main() -> wild_lib::error::Result {
 /// If errors it will return an error message with the errno set, if it can be read or -1 if not
 fn make_named_pipe() -> wild_lib::error::Result<String> {
     let path = "named_pipe";
+    if Path::new(&path).exists() {
+        fs::remove_file(path)?;
+    }
     let filename = CString::new(path)?;
     unsafe {
         match libc::mkfifo(filename.as_ptr(), 0o644) {
