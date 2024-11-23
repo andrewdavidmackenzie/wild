@@ -35,16 +35,19 @@ fn main() -> wild_lib::error::Result {
 
                         // inform parent that we are done!
                         let mut f = File::open(path)?;
-                        f.write_all("OK".as_bytes())?;
+                        f.write_all(&0i32.to_ne_bytes())?;
                         Ok(())
                     }
                     Ok(Fork::Parent(_child)) => {
                         // Wait for child to exit or pipe to be closed
                         let mut f = File::open(path)?;
-                        let mut response = String::new();
-                        let child_exit_status = f.read_to_string(&mut response)?;
-                        println!("Child Exit Status: {child_exit_status}");
-                        Ok(())
+                        let mut response = [0u8; 4];
+                        let count = f.read(&mut response)?;
+                        if count != 4 {
+                            return Err(anyhow!("Error retrieving exit status from child process"));
+                        }
+                        let child_exit_status = i32::from_ne_bytes(response);
+                        std::process::exit(child_exit_status);
                     }
                     Err(_) => {
                         // Create a linker with remaining args and run it
