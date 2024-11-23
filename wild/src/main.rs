@@ -8,6 +8,7 @@ use std::io::Error;
 use std::io::Read;
 use std::io::Write;
 use std::path::Path;
+use std::process;
 
 fn main() -> wild_lib::error::Result {
     // skip the program name
@@ -42,7 +43,7 @@ fn main() -> wild_lib::error::Result {
                             }
                             let child_exit_status = i32::from_ne_bytes(response);
                             fs::remove_file(path)?;
-                            std::process::exit(child_exit_status);
+                            process::exit(child_exit_status);
                         }
                         -1 => {
                             // Failure in the parent
@@ -79,11 +80,15 @@ fn main() -> wild_lib::error::Result {
 /// If successful it will return Ok with the name of the file
 /// If errors it will return an error message with the errno set, if it can be read or -1 if not
 fn make_named_pipe() -> wild_lib::error::Result<String> {
-    let path = "named_pipe";
+    let path = format!(
+        "{}/{}",
+        tempdir::TempDir::new("wild")?.path().display(),
+        process::id()
+    );
     if Path::new(&path).exists() {
-        fs::remove_file(path)?;
+        fs::remove_file(&path)?;
     }
-    let filename = CString::new(path)?;
+    let filename = CString::new(path.as_str())?;
     unsafe {
         match libc::mkfifo(filename.as_ptr(), 0o660) {
             0 => Ok(path.to_owned()),
