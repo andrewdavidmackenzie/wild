@@ -15,7 +15,6 @@ fn main() -> wild_lib::error::Result {
 
     // See if there is a better way to do this, more canonical
     let mut no_fork_subprocess = false;
-
     args.retain(|a| {
         if a == "--no-fork" {
             no_fork_subprocess = true;
@@ -58,6 +57,7 @@ fn main() -> wild_lib::error::Result {
                             // inform parent that we are done! - TODO this will be done in Linker
                             let mut f = File::open(path)?;
                             f.write_all(&0i32.to_ne_bytes())?;
+                            f.flush()?;
                             Ok(())
                         }
                     }
@@ -85,7 +85,7 @@ fn make_named_pipe() -> wild_lib::error::Result<String> {
     }
     let filename = CString::new(path)?;
     unsafe {
-        match libc::mkfifo(filename.as_ptr(), 0o644) {
+        match libc::mkfifo(filename.as_ptr(), 0o660) {
             0 => Ok(path.to_owned()),
             _ => Err(anyhow!(
                 "Error creating named pipe. Errno = {:?}",
