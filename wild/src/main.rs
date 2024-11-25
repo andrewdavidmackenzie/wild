@@ -1,5 +1,6 @@
 use anyhow::anyhow;
 use libc::fork;
+use std::env;
 use std::env::args;
 use std::ffi::CString;
 use std::fs;
@@ -7,7 +8,6 @@ use std::fs::File;
 use std::io::Error;
 use std::io::Read;
 use std::io::Write;
-use std::path::Path;
 use std::process;
 
 fn main() -> wild_lib::error::Result {
@@ -35,7 +35,8 @@ fn main() -> wild_lib::error::Result {
                     }
                     -1 => {
                         // Fork failure in the parent - Fallback to running linker in this process
-                        wild_lib::Linker::from_args(args.into_iter())?.run(None)
+                        Err(anyhow!("Failed to fork"))
+                        // wild_lib::Linker::from_args(args.into_iter())?.run(None)
                     }
                     _ => {
                         // Fork success in child - Run linker in this process with remaining args
@@ -59,10 +60,11 @@ fn main() -> wild_lib::error::Result {
                     }
                 }
             }
-            Err(_) => {
+            Err(e) => {
                 // TODO do we want to log the error, or output a warning?
+                Err(anyhow!("Could not create named pipe: '{e}'"))
                 // Failure to creat named pipe - Fallback to running linker in this process
-                wild_lib::Linker::from_args(args.into_iter())?.run(None)
+                // wild_lib::Linker::from_args(args.into_iter())?.run(None)
             }
         },
         true => {
@@ -91,19 +93,15 @@ fn wait_for_child_done(path: &str) -> wild_lib::error::Result {
 /// If successful it will return Ok with the name of the file
 /// If errors it will return an error message with the errno set, if it can be read or -1 if not
 fn make_named_pipe() -> wild_lib::error::Result<String> {
-    let path = format!(
-        "{}/{}",
-        tempdir::TempDir::new("wild")?.path().display(),
-        process::id()
-    );
-    if Path::new(&path).exists() {
+    let path = format!("{}/wild/{}", env::temp_dir().display(), process::id());
+    if let Ok(true) = fs::exists(&path) {
         fs::remove_file(&path)?;
     }
     let filename = CString::new(path.as_str())?;
     match unsafe { libc::mkfifo(filename.as_ptr(), 0o660) } {
-        0 => Ok(path.to_owned()),
+        0 => Ok(path),
         _ => Err(anyhow!(
-            "Error creating named pipe. Errno = {:?}",
+            "Error creating named pipe: '{path}' Errno = {:?}",
             Error::last_os_error().raw_os_error().unwrap_or(-1)
         )),
     }
