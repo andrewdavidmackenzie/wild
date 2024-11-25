@@ -9,7 +9,7 @@ fn main() -> wild_lib::error::Result {
     // skip the program name
     let mut args: Vec<String> = args().skip(1).collect();
 
-    // See if there is a better way to do this, more canonical
+    // TODO See if there is a better way to do this, more canonical
     let mut no_fork_subprocess = false;
     args.retain(|a| {
         if a == "--no-fork" {
@@ -66,8 +66,7 @@ fn inform_parent_done(fds: &[c_int], _exit_status: i32) {
     unsafe {
         libc::close(fds[0]);
         let stream = libc::fdopen(fds[1], "w".as_ptr() as *const i8);
-
-        //libc::fprintf(stream, 0i8.to_le_bytes().as_ptr() as *const i8);
+        let bytes = libc::fprintf(stream, 0i8.to_le_bytes().as_ptr() as *const i8);
         libc::fclose(stream);
     }
 }
