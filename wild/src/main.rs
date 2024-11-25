@@ -35,7 +35,7 @@ fn main() -> wild_lib::error::Result {
                     }
                     -1 => {
                         // Fork failure in the parent - Fallback to running linker in this process
-                        wild_lib::Linker::from_args(args.into_iter(), None)?.run()
+                        wild_lib::Linker::from_args(args.into_iter())?.run(None)
                     }
                     _ => {
                         // Fork success in child - Run linker in this process with remaining args
@@ -52,11 +52,8 @@ fn main() -> wild_lib::error::Result {
                                 }
                             }
                         };
-                        wild_lib::Linker::from_args(
-                            args.into_iter(),
-                            Some(Box::new(done_closure)),
-                        )?
-                        .run()?;
+                        wild_lib::Linker::from_args(args.into_iter())?
+                            .run(Some(Box::new(done_closure)))?;
 
                         Ok(())
                     }
@@ -65,12 +62,12 @@ fn main() -> wild_lib::error::Result {
             Err(_) => {
                 // TODO do we want to log the error, or output a warning?
                 // Failure to creat named pipe - Fallback to running linker in this process
-                wild_lib::Linker::from_args(args.into_iter(), None)?.run()
+                wild_lib::Linker::from_args(args.into_iter())?.run(None)
             }
         },
         true => {
             // Create a linker with remaining args and run it in this process
-            wild_lib::Linker::from_args(args.into_iter(), None)?.run()
+            wild_lib::Linker::from_args(args.into_iter())?.run(None)
         }
     }
 }
