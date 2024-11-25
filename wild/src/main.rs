@@ -30,45 +30,63 @@ fn main() -> wild_lib::error::Result {
             Ok(path) => {
                 match unsafe { fork() } {
                     0 => {
-                        // Success in the parent
-                        let mut f = File::open(&path)?;
-                        let mut response = [0u8; 4];
-                        // Wait for child to exit or pipe to be closed
-                        let count = f.read(&mut response);
-                        // Remove the file always - before checking other things
-                        fs::remove_file(path)?;
-                        match count {
-                            Ok(4) => process::exit(i32::from_ne_bytes(response)),
-                            _ => Err(anyhow!("Error retrieving exit status from child process")),
-                        }
+                        // Fork success in the parent
+                        wait_for_child_done(&path)
                     }
                     -1 => {
-                        // Failure in the parent
-                        // Create a linker with remaining args and run it
-                        wild_lib::Linker::from_args(args.into_iter())?.run()
+                        // Fork failure in the parent - Fallback to running linker in this process
+                        wild_lib::Linker::from_args(args.into_iter(), None)?.run()
                     }
                     _ => {
-                        // Success in the child
-                        // Create a linker with remaining args and run it
-                        wild_lib::Linker::from_args(args.into_iter())?.run()?;
+                        // Fork success in child - Run linker in this process with remaining args
+                        let done_closure = move |exit_status: i32| {
+                            // Runs in child process when linking work is done - inform parent
+                            match File::open(path) {
+                                Ok(mut pipe) => {
+                                    let bytes: [u8; 4] = exit_status.to_ne_bytes();
+                                    let _ = pipe.write_all(&bytes);
+                                    let _ = pipe.flush();
+                                }
+                                Err(e) => {
+                                    eprintln!("Error opening named pipe to parent process: '{e}'")
+                                }
+                            }
+                        };
+                        wild_lib::Linker::from_args(
+                            args.into_iter(),
+                            Some(Box::new(done_closure)),
+                        )?
+                        .run()?;
 
-                        // inform parent that we are done!
-                        let mut f = File::open(path)?;
-                        f.write_all(&0i32.to_ne_bytes())?;
-                        f.flush()?;
                         Ok(())
                     }
                 }
             }
             Err(_) => {
-                // Create a linker with remaining args and run it
-                wild_lib::Linker::from_args(args.into_iter())?.run()
+                // TODO do we want to log the error, or output a warning?
+                // Failure to creat named pipe - Fallback to running linker in this process
+                wild_lib::Linker::from_args(args.into_iter(), None)?.run()
             }
         },
         true => {
-            // Create a linker with remaining args and run it
-            wild_lib::Linker::from_args(args.into_iter())?.run()
+            // Create a linker with remaining args and run it in this process
+            wild_lib::Linker::from_args(args.into_iter(), None)?.run()
         }
+    }
+}
+
+/// Wait for the child process to signal it is done, by returning an exit code on the pipe
+/// or for its unexpected death by closure of the pipe before receiving anything back
+fn wait_for_child_done(path: &str) -> wild_lib::error::Result {
+    let mut f = File::open(path)?;
+    let mut response = [0u8; 4];
+    // Wait for child to exit or pipe to be closed
+    let count = f.read(&mut response);
+    // Remove the file always - before checking other things
+    fs::remove_file(path)?;
+    match count {
+        Ok(4) => process::exit(i32::from_ne_bytes(response)),
+        _ => Err(anyhow!("Error retrieving exit status from child process")),
     }
 }
 

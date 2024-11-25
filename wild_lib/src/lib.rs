@@ -53,17 +53,22 @@ pub(crate) mod verification;
 pub(crate) mod x86_64;
 
 pub struct Linker {
-    action: crate::args::Action,
+    action: args::Action,
+    _done_closure: Option<Box<dyn FnOnce(i32)>>,
 }
 
 impl Linker {
-    pub fn from_args<S: AsRef<str>, I: Iterator<Item = S>>(args: I) -> error::Result<Self> {
+    pub fn from_args<S: AsRef<str>, I: Iterator<Item = S>>(
+        args: I,
+        _done_closure: Option<Box<dyn FnOnce(i32)>>,
+    ) -> error::Result<Self> {
         Ok(Linker {
             action: parse(args)?,
+            _done_closure,
         })
     }
 
-    pub fn run(&self) -> crate::error::Result {
+    pub fn run(&self) -> error::Result {
         match &self.action {
             args::Action::Link(args) => {
                 if args.time_phases {
@@ -92,7 +97,7 @@ impl Linker {
 }
 
 #[tracing::instrument(skip_all, name = "Link")]
-fn link<S: storage::StorageModel, A: arch::Arch>(args: &Args) -> crate::error::Result {
+fn link<S: storage::StorageModel, A: arch::Arch>(args: &Args) -> error::Result {
     args.setup_thread_pool()?;
     let mut output = elf_writer::Output::new(args);
     let input_data = input_data::InputData::from_args(args)?;
