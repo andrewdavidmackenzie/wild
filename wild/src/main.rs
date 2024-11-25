@@ -28,9 +28,11 @@ fn main() -> wild_lib::error::Result {
                 Ok(_) => {
                     match unsafe { fork() } {
                         0 => {
-                            // Fork success in the parent - wait for the child to "signal" us it's done
-                            let exit_status = wait_for_child_done(&fds)?;
-                            process::exit(exit_status);
+                            // Fork success in child - Run linker in this process with remaining args
+                            let done_closure =
+                                move |exit_status: i32| inform_parent_done(&fds, exit_status);
+                            wild_lib::Linker::from_args(args.into_iter())?
+                                .run(Some(Box::new(done_closure)))
                         }
                         -1 => {
                             // Fork failure in the parent - Fallback to running linker in this process
@@ -38,11 +40,9 @@ fn main() -> wild_lib::error::Result {
                             wild_lib::Linker::from_args(args.into_iter())?.run(None)
                         }
                         _ => {
-                            // Fork success in child - Run linker in this process with remaining args
-                            let done_closure =
-                                move |exit_status: i32| inform_parent_done(&fds, exit_status);
-                            wild_lib::Linker::from_args(args.into_iter())?
-                                .run(Some(Box::new(done_closure)))
+                            // Fork success in the parent - wait for the child to "signal" us it's done
+                            let exit_status = wait_for_child_done(&fds)?;
+                            process::exit(exit_status);
                         }
                     }
                 }
