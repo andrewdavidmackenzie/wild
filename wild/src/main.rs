@@ -30,7 +30,7 @@ fn main() -> wild_lib::error::Result {
             Ok(path) => {
                 match unsafe { fork() } {
                     0 => {
-                        // Fork success in the parent
+                        // Fork success in the parent - wait for the child to "signal" us it's done
                         wait_for_child_done(&path)
                     }
                     -1 => {
