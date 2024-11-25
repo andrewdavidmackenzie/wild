@@ -2,6 +2,7 @@ use anyhow::anyhow;
 use libc::fork;
 use std::env::args;
 use std::ffi::c_int;
+use std::ffi::c_void;
 use std::io::Error;
 use std::process;
 
@@ -61,12 +62,12 @@ fn main() -> wild_lib::error::Result {
 }
 
 /// Inform the parent process that work of linker is done, sending the exit status over the pipe
-fn inform_parent_done(fds: &[c_int], _exit_status: i32) {
-    // Runs in child process when linking work is done - inform parent
+fn inform_parent_done(fds: &[c_int], exit_status: i32) {
     unsafe {
         libc::close(fds[0]);
         let stream = libc::fdopen(fds[1], "w".as_ptr() as *const i8);
-        let bytes = libc::fprintf(stream, 0i8.to_le_bytes().as_ptr() as *const i8);
+        let bytes: [u8; 4] = exit_status.to_ne_bytes();
+        libc::fwrite(bytes.as_ptr() as *const c_void, 4, 1, stream);
         libc::fclose(stream);
     }
 }
@@ -80,26 +81,12 @@ fn wait_for_child_done(fds: &[c_int]) -> wild_lib::error::Result<i32> {
         // open the other end of the pipe for reading
         let stream = libc::fdopen(fds[0], "r".as_ptr() as *const i8);
 
-        // Wait for child to exit or pipe to be closed
-        /*
-        let mut count = 0;
-        let mut response = [0i8; 1];
-        loop {
-            let c = libc::fgetc(stream);
-            if c == libc::EOF {
-                println!("Error retrieving exit status from child process. count ={count}");
-                break;
-            }
-            response[count] = c as i8;
-            if count == 1 {
-                break;
-            }
-            count = count + 1;
+        // Wait for child to send exit_status or pipe to be closed
+        let mut response: [u8; 4] = [0u8; 4];
+        match libc::fread(response.as_mut_ptr() as *mut c_void, 1, 4, stream) {
+            4 => Ok(i32::from_ne_bytes(response)),
+            _ => Err(anyhow!("Could not read exit_status response from child")),
         }
-         */
-        let _c = libc::fgetc(stream);
-
-        Ok(0)
     }
 }
 
