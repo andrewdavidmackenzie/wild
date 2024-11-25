@@ -110,10 +110,10 @@ fn link<S: storage::StorageModel, A: arch::Arch>(
     let output_file = output.write::<S, A>(&layout)?;
     diff::maybe_diff()?;
 
-    let scope = tracing::info_span!("Shutdown");
     if let Some(done_callback) = done_closure {
         done_callback(0);
     }
+    let scope = tracing::info_span!("Shutdown");
     let _scope = scope.enter();
     shutdown::free_output(output_file);
     shutdown::free_layout(layout);
