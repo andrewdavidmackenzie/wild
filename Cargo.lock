@@ -566,7 +566,7 @@ checksum = "d8adc4bb1803a324070e64a98ae98f38934d91957a99cfb3a43dcbc01bc56439"
 
 [[package]]
 name = "linker-diff"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "bytemuck",
@@ -585,7 +585,7 @@ dependencies = [
 
 [[package]]
 name = "linker-layout"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "postcard",
@@ -594,7 +594,7 @@ dependencies = [
 
 [[package]]
 name = "linker-trace"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "postcard",
@@ -603,7 +603,7 @@ dependencies = [
 
 [[package]]
 name = "linker-utils"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "object",
 ]
